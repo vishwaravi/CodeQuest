@@ -200,7 +200,7 @@ export const initializeBattleSocket = (io) => {
       }
     });
 
-    // Code change (real-time sync)
+    // Code change (real-time sync) - DEPRECATED, use battle:code-sync instead
     socket.on('battle:code-change', async ({ battleId, userId, code }) => {
       try {
         const battle = await Battle.findOne({ battleId });
@@ -217,6 +217,51 @@ export const initializeBattleSocket = (io) => {
         });
       } catch (error) {
         console.error('❌ Error updating code:', error);
+      }
+    });
+
+    // Code sync with full code (debounced from client)
+    socket.on('battle:code-sync', async ({ battleId, userId, code, codeLength }) => {
+      try {
+        const battle = await Battle.findOne({ battleId });
+        
+        if (!battle) return;
+
+        battle.updatePlayerCode(userId, code);
+        await battle.save();
+
+        // Broadcast full code to opponent
+        socket.to(battleId).emit('battle:opponent-code-sync', {
+          userId,
+          code,
+          codeLength
+        });
+
+        console.log(`📝 Code synced for user ${userId}: ${codeLength} chars`);
+      } catch (error) {
+        console.error('❌ Error syncing code:', error);
+      }
+    });
+
+    // Language change
+    socket.on('battle:language-change', async ({ battleId, userId, language }) => {
+      try {
+        const battle = await Battle.findOne({ battleId });
+        
+        if (!battle) return;
+
+        battle.updatePlayerLanguage(userId, language);
+        await battle.save();
+
+        // Notify both players
+        io.to(battleId).emit('battle:language-changed', {
+          userId,
+          language
+        });
+
+        console.log(`🌐 Language changed for user ${userId}: ${language}`);
+      } catch (error) {
+        console.error('❌ Error changing language:', error);
       }
     });
 
@@ -286,6 +331,119 @@ export const initializeBattleSocket = (io) => {
       } catch (error) {
         console.error('❌ Error submitting solution:', error);
         socket.emit('battle:error', { message: 'Failed to submit solution' });
+      }
+    });
+
+    // Handle player leaving battle
+    socket.on('battle:leave', async ({ battleId, userId }) => {
+      try {
+        console.log(`🚪 Player ${userId} leaving battle ${battleId}`);
+
+        const battle = await Battle.findOne({ battleId })
+          .populate('players.user', 'username avatar rating')
+          .populate('question');
+
+        if (!battle) {
+          return socket.emit('battle:error', { message: 'Battle not found' });
+        }
+
+        // Find the leaving player and opponent
+        const leavingPlayer = battle.players.find(p => p.user._id.toString() === userId);
+        const opponent = battle.players.find(p => p.user._id.toString() !== userId);
+
+        if (!leavingPlayer) {
+          return socket.emit('battle:error', { message: 'Player not in battle' });
+        }
+
+        // If battle hasn't started yet, just cancel it
+        if (battle.status === 'waiting' || battle.status === 'ready') {
+          battle.status = 'cancelled';
+          await battle.save();
+
+          // Notify both players
+          io.to(battleId).emit('battle:cancelled', {
+            message: `${leavingPlayer.user.username} left the battle`,
+            reason: 'player_left'
+          });
+
+          // Remove from active battles
+          matchmakingQueue.completeBattle(battleId);
+          
+          console.log(`❌ Battle ${battleId} cancelled - player left before start`);
+          return;
+        }
+
+        // If battle is in progress, opponent wins by forfeit
+        if (battle.status === 'in-progress') {
+          battle.status = 'completed';
+          battle.winner = opponent.user._id;
+          battle.completedAt = new Date();
+          
+          // Calculate duration
+          if (battle.startedAt) {
+            battle.duration = Math.floor((battle.completedAt - battle.startedAt) / 1000);
+          }
+
+          // Mark leaving player as failed
+          leavingPlayer.result = 'forfeit';
+          leavingPlayer.testsPassed = 0;
+          leavingPlayer.totalTests = 0;
+
+          // Mark opponent as winner
+          opponent.result = 'won_by_forfeit';
+          opponent.testsPassed = opponent.totalTests || 0;
+
+          await battle.save();
+
+          // Update user stats and ratings
+          const leavingUser = await User.findById(userId);
+          const opponentUser = await User.findById(opponent.user._id);
+
+          if (leavingUser) {
+            leavingUser.stats.totalMatches += 1;
+            leavingUser.stats.losses += 1;
+            leavingUser.rating = Math.max(0, leavingUser.rating - 30); // Harsh penalty for leaving
+            leavingUser.stats.winRate = leavingUser.stats.totalMatches > 0 
+              ? ((leavingUser.stats.wins / leavingUser.stats.totalMatches) * 100).toFixed(2)
+              : 0;
+            await leavingUser.save();
+          }
+
+          if (opponentUser) {
+            opponentUser.stats.totalMatches += 1;
+            opponentUser.stats.wins += 1;
+            opponentUser.rating += 20; // Bonus for opponent
+            opponentUser.stats.winRate = opponentUser.stats.totalMatches > 0 
+              ? ((opponentUser.stats.wins / opponentUser.stats.totalMatches) * 100).toFixed(2)
+              : 0;
+            await opponentUser.save();
+          }
+
+          // Notify both players
+          io.to(battleId).emit('battle:player-left', {
+            leftPlayer: {
+              userId: leavingPlayer.user._id,
+              username: leavingPlayer.user.username
+            },
+            winner: opponent.user,
+            message: `${leavingPlayer.user.username} left the battle. ${opponent.user.username} wins by forfeit!`
+          });
+
+          // Notify battle completion
+          io.to(battleId).emit('battle:completed', {
+            winner: opponent.user,
+            battle: battle.getBattleData(),
+            reason: 'forfeit'
+          });
+
+          // Remove from active battles
+          matchmakingQueue.completeBattle(battleId);
+
+          console.log(`🏆 Battle ${battleId} completed by forfeit. Winner: ${opponent.user.username}`);
+        }
+      } catch (error) {
+        console.error('❌ Error handling player leave:', error);
+        socket.emit('battle:error', { message: 'Failed to leave battle' });
       }
     });
 

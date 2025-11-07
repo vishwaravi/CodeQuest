@@ -90,6 +90,11 @@ class SocketService {
     this.socket.emit('battle:submit', { battleId, userId, code, result });
   }
 
+  // Leave battle
+  leaveBattle(battleId, userId) {
+    this.socket.emit('battle:leave', { battleId, userId });
+  }
+
   // Listen to battle events
   onQueueJoined(callback) {
     this.socket.on('queue:joined', callback);
@@ -151,6 +156,14 @@ class SocketService {
     this.socket.on('battle:completed', callback);
   }
 
+  onBattleCancelled(callback) {
+    this.socket.on('battle:cancelled', callback);
+  }
+
+  onPlayerLeft(callback) {
+    this.socket.on('battle:player-left', callback);
+  }
+
   // Remove battle event listeners
   offBattleEvents() {
     const events = [
@@ -168,7 +181,9 @@ class SocketService {
       'battle:opponent-code-sync',
       'battle:language-changed',
       'battle:player-submitted',
-      'battle:completed'
+      'battle:completed',
+      'battle:cancelled',
+      'battle:player-left'
     ];
 
     events.forEach(event => {

@@ -24,6 +24,11 @@ const battleSchema = new mongoose.Schema({
       required: true
     },
     socketId: String,
+    language: {
+      type: String,
+      default: 'javascript',
+      enum: ['javascript', 'python', 'java', 'cpp', 'c', 'csharp', 'typescript', 'go', 'rust', 'php']
+    },
     isReady: {
       type: Boolean,
       default: false
@@ -38,7 +43,7 @@ const battleSchema = new mongoose.Schema({
     executionTime: Number, // in milliseconds
     result: {
       type: String,
-      enum: ['pending', 'passed', 'failed', 'error', 'timeout'],
+      enum: ['pending', 'passed', 'failed', 'error', 'timeout', 'forfeit', 'won_by_forfeit'],
       default: 'pending'
     }
   }],
@@ -104,6 +109,18 @@ battleSchema.methods.updatePlayerCode = function(userId, code) {
   const player = this.players.find(p => p.user.toString() === userId.toString());
   if (player) {
     player.code = code;
+  }
+};
+
+battleSchema.methods.updatePlayerLanguage = function(userId, language) {
+  const player = this.players.find(p => {
+    const playerId = p.user._id ? p.user._id.toString() : p.user.toString();
+    return playerId === userId.toString();
+  });
+  
+  if (player) {
+    player.language = language;
+    console.log(`🌐 Player ${userId} changed language to ${language}`);
   }
 };
 

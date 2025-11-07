@@ -27,6 +27,7 @@ const BattleRoom = () => {
   const [opponentStatus, setOpponentStatus] = useState({ codeLength: 0, submitted: false });
   const [winner, setWinner] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   
   const timerRef = useRef(null);
   const codeSyncRef = useRef(null);
@@ -150,7 +151,13 @@ const BattleRoom = () => {
       setBattleEnded(true);
       setWinner(data.winner);
       
-      if (data.winner) {
+      if (data.reason === 'forfeit') {
+        if (data.winner._id === user._id) {
+          toast.success('You win by forfeit! 🏆', { duration: 5000 });
+        } else {
+          toast.error('You lost the battle', { duration: 5000 });
+        }
+      } else if (data.winner) {
         if (data.winner._id === user._id) {
           toast.success('🎉 Victory! You won the battle!', { duration: 5000 });
         } else {
@@ -159,6 +166,21 @@ const BattleRoom = () => {
       } else {
         toast('🤝 Draw! Both players had the same result!', { duration: 5000 });
       }
+    });
+
+    socketService.onBattleCancelled((data) => {
+      console.log('❌ Battle cancelled:', data);
+      toast.error(data.message || 'Battle was cancelled');
+      setTimeout(() => {
+        navigate('/matchmaking');
+      }, 2000);
+    });
+
+    socketService.onPlayerLeft((data) => {
+      console.log('🚪 Player left:', data);
+      toast.success(data.message, { duration: 5000 });
+      setBattleEnded(true);
+      setWinner(data.winner);
     });
 
     socketService.onBattleError((error) => {
@@ -218,6 +240,23 @@ const BattleRoom = () => {
     toast.success('Solution submitted!');
   };
 
+  const handleLeaveBattle = () => {
+    setShowLeaveModal(true);
+  };
+
+  const confirmLeaveBattle = () => {
+    socketService.leaveBattle(battleId, user._id);
+    setShowLeaveModal(false);
+    toast.success('Leaving battle...');
+    setTimeout(() => {
+      navigate('/matchmaking');
+    }, 1000);
+  };
+
+  const cancelLeaveBattle = () => {
+    setShowLeaveModal(false);
+  };
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -266,9 +305,48 @@ const BattleRoom = () => {
             <div className="text-sm text-gray-400">
               Battle ID: <span className="text-gray-300">{battleId.slice(-8)}</span>
             </div>
+            {!battleEnded && (
+              <button
+                onClick={handleLeaveBattle}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-all text-sm"
+              >
+                🚪 Leave Battle
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Leave Battle Confirmation Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+          <div className="bg-gray-800 rounded-lg p-8 max-w-md border-2 border-red-500">
+            <div className="text-center">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-white mb-4">Leave Battle?</h2>
+              <p className="text-gray-300 mb-6">
+                {battleStarted 
+                  ? "Leaving an ongoing battle will count as a loss and you'll lose 30 rating points. Your opponent will win by forfeit."
+                  : "Are you sure you want to leave this battle? The match will be cancelled."}
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={cancelLeaveBattle}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={confirmLeaveBattle}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Countdown Overlay */}
       {countdown !== null && (
