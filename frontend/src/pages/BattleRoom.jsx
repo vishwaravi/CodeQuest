@@ -36,7 +36,7 @@ const BattleRoom = () => {
     socketService.connect();
 
     // Join battle room
-    socketService.joinBattle(battleId, user._id);
+    socketService.joinBattle(battleId, user.id);
 
     // Listen to battle events
     socketService.onBattleJoined((data) => {
@@ -45,19 +45,19 @@ const BattleRoom = () => {
       setQuestion(data.battle.question);
       setCode(data.playerData?.code || data.battle.question.starterCode?.javascript || '');
       
-      // Identify opponent
-      const opp = data.battle.players.find(p => p.user._id !== user._id);
+      // Identify opponent (note: populated user has _id, not id)
+      const opp = data.battle.players.find(p => p.user._id !== user.id);
       setOpponent(opp);
       
       // Check ready status
-      const myPlayer = data.battle.players.find(p => p.user._id === user._id);
+      const myPlayer = data.battle.players.find(p => p.user._id === user.id);
       setIsReady(myPlayer?.isReady || false);
       setOpponentReady(opp?.isReady || false);
     });
 
     socketService.onPlayerReady((data) => {
       console.log('👍 Player ready:', data);
-      if (data.userId === user._id) {
+      if (data.userId === user.id) {
         setIsReady(true);
       } else {
         setOpponentReady(true);
@@ -100,7 +100,7 @@ const BattleRoom = () => {
 
     socketService.onPlayerSubmitted((data) => {
       console.log('📝 Player submitted:', data);
-      if (data.userId !== user._id) {
+      if (data.userId !== user.id) {
         setOpponentStatus(prev => ({ ...prev, submitted: true }));
         toast.success('Opponent submitted their solution!');
       }
@@ -113,7 +113,7 @@ const BattleRoom = () => {
       setWinner(data.winner);
       
       if (data.winner) {
-        if (data.winner._id === user._id) {
+        if (data.winner._id === user.id) {
           toast.success('🎉 Victory! You won the battle!', { duration: 5000 });
         } else {
           toast.error('💔 Defeat! Better luck next time!', { duration: 5000 });
@@ -136,7 +136,7 @@ const BattleRoom = () => {
   }, [battleId, user, navigate]);
 
   const handleReady = () => {
-    socketService.markReady(battleId, user._id);
+    socketService.markReady(battleId, user.id);
   };
 
   const handleCodeChange = (e) => {
@@ -145,7 +145,7 @@ const BattleRoom = () => {
     
     // Throttle code change events (send every 2 seconds)
     if (battleStarted && !submitted) {
-      socketService.sendCodeChange(battleId, user._id, newCode);
+      socketService.sendCodeChange(battleId, user.id, newCode);
     }
   };
 
@@ -164,7 +164,7 @@ const BattleRoom = () => {
       status: testsPassed === totalTests ? 'passed' : 'failed'
     };
 
-    socketService.submitSolution(battleId, user._id, code, result);
+    socketService.submitSolution(battleId, user.id, code, result);
     setSubmitted(true);
     toast.success('Solution submitted!');
   };
@@ -235,10 +235,10 @@ const BattleRoom = () => {
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <div className="bg-gray-800 rounded-lg p-12 text-center max-w-md border-2 border-purple-500">
             <div className="text-6xl mb-4">
-              {winner?._id === user._id ? '🏆' : winner ? '💔' : '🤝'}
+              {winner?._id === user.id ? '🏆' : winner ? '💔' : '🤝'}
             </div>
             <h2 className="text-4xl font-bold text-white mb-4">
-              {winner?._id === user._id ? 'Victory!' : winner ? 'Defeat!' : 'Draw!'}
+              {winner?._id === user.id ? 'Victory!' : winner ? 'Defeat!' : 'Draw!'}
             </h2>
             {winner && (
               <p className="text-xl text-gray-300 mb-6">

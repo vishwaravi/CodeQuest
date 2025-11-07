@@ -20,7 +20,7 @@ const Matchmaking = () => {
     }
 
     console.log('👤 Matchmaking - Current User:', user);
-    console.log('🆔 User ID:', user._id);
+    console.log('🆔 User ID:', user.id);
 
     // Connect socket
     socketService.connect();
@@ -67,8 +67,8 @@ const Matchmaking = () => {
 
     // Cleanup
     return () => {
-      if (searching) {
-        socketService.leaveQueue(user._id);
+      if (searching && user?.id) {
+        socketService.leaveQueue(user.id);
       }
       socketService.offBattleEvents();
     };
@@ -96,21 +96,21 @@ const Matchmaking = () => {
   };
 
   const handleFindMatch = () => {
-    if (!user || !user._id) {
+    if (!user || !user.id) {
       toast.error('User not loaded. Please refresh the page.');
       return;
     }
 
     if (searching) {
       // Cancel search
-      console.log('🛑 Canceling search for user:', user._id);
-      socketService.leaveQueue(user._id);
+      console.log('🛑 Canceling search for user:', user.id);
+      socketService.leaveQueue(user.id);
       setSearching(false);
     } else {
       // Start search
-      console.log('🎮 Starting search for user:', user._id, 'Difficulty:', difficulty);
+      console.log('🎮 Starting search for user:', user.id, 'Difficulty:', difficulty);
       console.log('📋 Full user object:', user);
-      socketService.joinQueue(user._id, difficulty);
+      socketService.joinQueue(user.id, difficulty);
       setSearching(true);
     }
   };
