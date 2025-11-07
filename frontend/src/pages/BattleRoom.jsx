@@ -61,28 +61,67 @@ const BattleRoom = () => {
     socketService.onBattleJoined((data) => {
       console.log('🎮 Joined battle:', data);
       setBattle(data.battle);
-      setQuestion(data.battle.question);
+      setQuestion(data.question || data.battle.question);
       
       // Get my player data
       const myPlayer = data.battle.players.find(p => p.user._id === user._id);
-      const myLang = myPlayer?.language || 'javascript';
+      const myLang = myPlayer?.language || data.playerData?.language || 'javascript';
       setLanguage(myLang);
       
       // Set initial code
       const initialCode = myPlayer?.code || 
-                          data.battle.question.starterCode?.[myLang] || 
+                          data.playerData?.code ||
+                          data.question?.starterCode?.[myLang] ||
+                          data.battle.question?.starterCode?.[myLang] || 
                           STARTER_CODE[myLang] || 
                           '';
       setMyCode(initialCode);
       
       // Identify opponent
-      const opp = data.battle.players.find(p => p.user._id !== user._id);
+      const opp = data.opponent || data.battle.players.find(p => p.user._id !== user._id);
       setOpponent(opp);
       setOpponentCode(opp?.code || '');
       
       // Check ready status
-      setIsReady(myPlayer?.isReady || false);
-      setOpponentReady(opp?.isReady || false);
+      const myIsReady = myPlayer?.isReady || data.playerData?.isReady || false;
+      const oppIsReady = opp?.isReady || false;
+      setIsReady(myIsReady);
+      setOpponentReady(oppIsReady);
+      
+      // Check if battle already started
+      if (data.battleStatus === 'in-progress') {
+        console.log('⚡ Battle already in progress');
+        setBattleStarted(true);
+        setIsReady(true);
+        setOpponentReady(true);
+        
+        // Set submitted status if already submitted
+        if (data.playerData?.submitted) {
+          setSubmitted(true);
+        }
+      }
+    });
+
+    // Handle battle already started event
+    socketService.on('battle:already-started', (data) => {
+      console.log('⚡ Battle already started:', data);
+      setBattleStarted(true);
+      setIsReady(true);
+      setOpponentReady(true);
+      setTimeRemaining(data.timeRemaining);
+      
+      toast.success('Rejoined ongoing battle!', { duration: 3000 });
+      
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     });
 
     socketService.onPlayerReady((data) => {

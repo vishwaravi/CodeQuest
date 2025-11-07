@@ -98,14 +98,19 @@ export const initializeBattleSocket = (io) => {
     // Join battle room
     socket.on('battle:join', async ({ battleId, userId }) => {
       try {
+        console.log(`🎮 User ${userId} attempting to join battle ${battleId}`);
+        
         const battle = await Battle.findOne({ battleId })
           .populate('question')
           .populate('players.user', 'username avatar rating');
 
         if (!battle) {
+          console.error(`❌ Battle not found: ${battleId}`);
           socket.emit('battle:error', { message: 'Battle not found' });
           return;
         }
+
+        console.log(`📊 Battle status: ${battle.status}`);
 
         // Verify user is part of this battle
         const isPlayer = battle.players.some(
@@ -113,6 +118,7 @@ export const initializeBattleSocket = (io) => {
         );
 
         if (!isPlayer) {
+          console.error(`❌ User ${userId} not authorized for battle ${battleId}`);
           socket.emit('battle:error', { message: 'Not authorized for this battle' });
           return;
         }
@@ -131,13 +137,42 @@ export const initializeBattleSocket = (io) => {
 
         socketUserMap.set(socket.id, userId);
 
+        // Get player data for this user
+        const playerData = battle.players.find(
+          p => p.user._id.toString() === userId.toString()
+        );
+
+        const opponent = battle.players.find(
+          p => p.user._id.toString() !== userId.toString()
+        );
+
         // Send battle data to player
         socket.emit('battle:joined', {
           battle: battle.getBattleData(),
-          playerData: battle.getPlayerData(userId)
+          question: battle.question,
+          opponent: opponent,
+          playerData: {
+            isReady: playerData?.isReady || false,
+            code: playerData?.code || '',
+            language: playerData?.language || 'javascript',
+            submitted: playerData?.result !== 'pending'
+          },
+          battleStatus: battle.status,
+          startedAt: battle.startedAt
         });
 
-        console.log(`🎮 User ${userId} joined battle ${battleId}`);
+        console.log(`✅ User ${userId} successfully joined battle ${battleId}`);
+        
+        // If battle is already in progress, notify the player
+        if (battle.status === 'in-progress' && battle.startedAt) {
+          const timeLimit = 15 * 60; // 15 minutes in seconds
+          const elapsedTime = Math.floor((Date.now() - battle.startedAt.getTime()) / 1000);
+          const remainingTime = Math.max(0, timeLimit - elapsedTime);
+          
+          socket.emit('battle:already-started', {
+            timeRemaining: remainingTime
+          });
+        }
       } catch (error) {
         console.error('❌ Error joining battle:', error);
         socket.emit('battle:error', { message: 'Failed to join battle' });
