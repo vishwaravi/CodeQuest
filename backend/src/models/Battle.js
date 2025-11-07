@@ -108,16 +108,29 @@ battleSchema.methods.updatePlayerCode = function(userId, code) {
 };
 
 battleSchema.methods.markPlayerReady = function(userId) {
-  const player = this.players.find(p => p.user.toString() === userId.toString());
+  const player = this.players.find(p => {
+    const playerId = p.user._id ? p.user._id.toString() : p.user.toString();
+    return playerId === userId.toString();
+  });
+  
   if (player) {
     player.isReady = true;
+    console.log(`✅ Player ${userId} marked ready`);
+  } else {
+    console.log(`❌ Player ${userId} not found in battle`);
   }
   
   // Check if all players are ready
   const allReady = this.players.every(p => p.isReady);
+  console.log(`🔍 All players ready check: ${allReady}`, this.players.map(p => ({ 
+    user: p.user._id || p.user, 
+    isReady: p.isReady 
+  })));
+  
   if (allReady && this.status === 'ready') {
     this.status = 'in-progress';
     this.startedAt = new Date();
+    console.log(`🚀 Battle status changed to in-progress`);
   }
 };
 

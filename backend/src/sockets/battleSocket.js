@@ -48,21 +48,11 @@ export const initializeBattleSocket = (io) => {
     // Join matchmaking queue
     socket.on('queue:join', async ({ userId, difficulty }) => {
       try {
-        console.log('🎮 Queue join request:', { userId, difficulty });
-        
-        if (!userId) {
-          socket.emit('queue:error', { message: 'User ID is required' });
-          return;
-        }
-
         const user = await User.findById(userId);
         if (!user) {
-          console.error('❌ User not found in database:', userId);
           socket.emit('queue:error', { message: 'User not found' });
           return;
         }
-
-        console.log('✅ User found:', user.username, 'Rating:', user.rating);
 
         socketUserMap.set(socket.id, userId);
 
@@ -165,17 +155,29 @@ export const initializeBattleSocket = (io) => {
           return;
         }
 
+        console.log(`👍 Player ${userId} clicked ready in battle ${battleId}`);
+        console.log(`📊 Current battle status: ${battle.status}`);
+        console.log(`👥 Players before marking ready:`, battle.players.map(p => ({
+          userId: p.user._id,
+          username: p.user.username,
+          isReady: p.isReady
+        })));
+
         battle.markPlayerReady(userId);
         await battle.save();
+
+        const allReady = battle.players.every(p => p.isReady);
+        console.log(`✅ All players ready: ${allReady}`);
 
         // Notify both players
         io.to(battleId).emit('battle:player-ready', {
           userId,
-          allReady: battle.players.every(p => p.isReady)
+          allReady
         });
 
         // If all players ready, start countdown
-        if (battle.players.every(p => p.isReady) && battle.status === 'in-progress') {
+        if (allReady && battle.status === 'in-progress') {
+          console.log(`🎬 Starting countdown for battle ${battleId}`);
           // Start 3-second countdown
           let countdown = 3;
           const countdownInterval = setInterval(() => {
@@ -188,6 +190,7 @@ export const initializeBattleSocket = (io) => {
                 startTime: new Date(),
                 timeLimit: battle.question.timeLimit || 1800 // 30 minutes default
               });
+              console.log(`🚀 Battle ${battleId} started!`);
             }
           }, 1000);
         }
