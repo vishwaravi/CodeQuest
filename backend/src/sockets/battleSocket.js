@@ -211,8 +211,14 @@ export const initializeBattleSocket = (io) => {
         });
 
         // If all players ready, start countdown
-        if (allReady && battle.status === 'in-progress') {
+        if (allReady && (battle.status === 'ready' || battle.status === 'waiting')) {
           console.log(`🎬 Starting countdown for battle ${battleId}`);
+          
+          // Update battle status to in-progress
+          battle.status = 'in-progress';
+          battle.startedAt = new Date();
+          await battle.save();
+          
           // Start 3-second countdown
           let countdown = 3;
           const countdownInterval = setInterval(() => {
@@ -223,7 +229,7 @@ export const initializeBattleSocket = (io) => {
               clearInterval(countdownInterval);
               io.to(battleId).emit('battle:start', {
                 startTime: new Date(),
-                timeLimit: battle.question.timeLimit || 1800 // 30 minutes default
+                timeLimit: 900 // 15 minutes in seconds
               });
               console.log(`🚀 Battle ${battleId} started!`);
             }
