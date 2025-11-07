@@ -19,6 +19,9 @@ const Matchmaking = () => {
       return;
     }
 
+    console.log('👤 Matchmaking - Current User:', user);
+    console.log('🆔 User ID:', user._id);
+
     // Connect socket
     socketService.connect();
 
@@ -93,12 +96,20 @@ const Matchmaking = () => {
   };
 
   const handleFindMatch = () => {
+    if (!user || !user._id) {
+      toast.error('User not loaded. Please refresh the page.');
+      return;
+    }
+
     if (searching) {
       // Cancel search
+      console.log('🛑 Canceling search for user:', user._id);
       socketService.leaveQueue(user._id);
       setSearching(false);
     } else {
       // Start search
+      console.log('🎮 Starting search for user:', user._id, 'Difficulty:', difficulty);
+      console.log('📋 Full user object:', user);
       socketService.joinQueue(user._id, difficulty);
       setSearching(true);
     }

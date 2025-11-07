@@ -48,11 +48,21 @@ export const initializeBattleSocket = (io) => {
     // Join matchmaking queue
     socket.on('queue:join', async ({ userId, difficulty }) => {
       try {
+        console.log('🎮 Queue join request:', { userId, difficulty });
+        
+        if (!userId) {
+          socket.emit('queue:error', { message: 'User ID is required' });
+          return;
+        }
+
         const user = await User.findById(userId);
         if (!user) {
+          console.error('❌ User not found in database:', userId);
           socket.emit('queue:error', { message: 'User not found' });
           return;
         }
+
+        console.log('✅ User found:', user.username, 'Rating:', user.rating);
 
         socketUserMap.set(socket.id, userId);
 
