@@ -50,6 +50,42 @@ export const apiService = {
     const response = await api.get('/api/test');
     return response.data;
   },
+
+  // Auth endpoints
+  register: async (username, email, password) => {
+    const response = await api.post('/api/auth/register', {
+      username,
+      email,
+      password,
+    });
+    return response.data;
+  },
+
+  login: async (email, password) => {
+    const response = await api.post('/api/auth/login', {
+      email,
+      password,
+    });
+    return response.data;
+  },
+
+  getMe: async () => {
+    const response = await api.get('/api/auth/me');
+    return response.data;
+  },
+
+  updateProfile: async (data) => {
+    const response = await api.put('/api/auth/profile', data);
+    return response.data;
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const response = await api.put('/api/auth/password', {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  },
 };
 
 export default api;

@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import testRoutes from './routes/testRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
 // Load environment variables
@@ -45,6 +46,7 @@ if (process.env.NODE_ENV === 'development') {
 // Routes
 app.use('/', testRoutes);
 app.use('/api', testRoutes);
+app.use('/api/auth', authRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {

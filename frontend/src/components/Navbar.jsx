@@ -1,6 +1,15 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   return (
     <nav className="bg-gray-800 border-b border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,15 +30,45 @@ const Navbar = () => {
             >
               Home
             </Link>
+            
+            {isAuthenticated && (
+              <Link
+                to="/dashboard"
+                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
+              >
+                Dashboard
+              </Link>
+            )}
+            
             <Link
               to="/test"
               className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
             >
               Test
             </Link>
-            <button className="btn-primary">
-              Sign In
-            </button>
+
+            {isAuthenticated ? (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 px-3 py-1 bg-gray-700 rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-white">
+                    {user?.username}
+                  </span>
+                </div>
+                <button onClick={handleLogout} className="btn bg-red-600 hover:bg-red-700 text-white">
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link to="/login" className="btn-outline">
+                  Login
+                </Link>
+                <Link to="/register" className="btn-primary">
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
