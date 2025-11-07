@@ -70,9 +70,19 @@ class SocketService {
     this.socket.emit('battle:ready', { battleId, userId });
   }
 
-  // Send code change
+  // Send code change (deprecated - use sendCodeSync instead)
   sendCodeChange(battleId, userId, code) {
     this.socket.emit('battle:code-change', { battleId, userId, code });
+  }
+
+  // Send code sync with full code (debounced)
+  sendCodeSync(battleId, userId, code, codeLength) {
+    this.socket.emit('battle:code-sync', { battleId, userId, code, codeLength });
+  }
+
+  // Send language change
+  sendLanguageChange(battleId, userId, language) {
+    this.socket.emit('battle:language-change', { battleId, userId, language });
   }
 
   // Submit solution
@@ -125,6 +135,14 @@ class SocketService {
     this.socket.on('battle:opponent-code-change', callback);
   }
 
+  onOpponentCodeSync(callback) {
+    this.socket.on('battle:opponent-code-sync', callback);
+  }
+
+  onLanguageChanged(callback) {
+    this.socket.on('battle:language-changed', callback);
+  }
+
   onPlayerSubmitted(callback) {
     this.socket.on('battle:player-submitted', callback);
   }
@@ -147,6 +165,8 @@ class SocketService {
       'battle:countdown',
       'battle:start',
       'battle:opponent-code-change',
+      'battle:opponent-code-sync',
+      'battle:language-changed',
       'battle:player-submitted',
       'battle:completed'
     ];

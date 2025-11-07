@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import socketService from '../services/socket';
 import toast from 'react-hot-toast';
+import CodeComparison from '../components/CodeComparison';
+import { LANGUAGE_OPTIONS, STARTER_CODE } from '../constants/languages';
 
 const BattleRoom = () => {
   const { battleId } = useParams();
@@ -13,7 +15,9 @@ const BattleRoom = () => {
   const [battle, setBattle] = useState(null);
   const [question, setQuestion] = useState(null);
   const [opponent, setOpponent] = useState(null);
-  const [code, setCode] = useState('');
+  const [myCode, setMyCode] = useState('');
+  const [opponentCode, setOpponentCode] = useState('');
+  const [language, setLanguage] = useState('javascript');
   const [isReady, setIsReady] = useState(false);
   const [opponentReady, setOpponentReady] = useState(false);
   const [countdown, setCountdown] = useState(null);
@@ -25,6 +29,20 @@ const BattleRoom = () => {
   const [submitted, setSubmitted] = useState(false);
   
   const timerRef = useRef(null);
+  const codeSyncRef = useRef(null);
+
+  // Debounced code sync
+  const syncCode = useCallback((code) => {
+    if (codeSyncRef.current) {
+      clearTimeout(codeSyncRef.current);
+    }
+
+    codeSyncRef.current = setTimeout(() => {
+      if (battleStarted && !submitted) {
+        socketService.sendCodeSync(battleId, user._id, code, code.length);
+      }
+    }, 500); // 500ms debounce
+  }, [battleId, user, battleStarted, submitted]);
 
   useEffect(() => {
     if (!user) {
@@ -36,28 +54,39 @@ const BattleRoom = () => {
     socketService.connect();
 
     // Join battle room
-    socketService.joinBattle(battleId, user.id);
+    socketService.joinBattle(battleId, user._id);
 
     // Listen to battle events
     socketService.onBattleJoined((data) => {
       console.log('🎮 Joined battle:', data);
       setBattle(data.battle);
       setQuestion(data.battle.question);
-      setCode(data.playerData?.code || data.battle.question.starterCode?.javascript || '');
       
-      // Identify opponent (note: populated user has _id, not id)
-      const opp = data.battle.players.find(p => p.user._id !== user.id);
+      // Get my player data
+      const myPlayer = data.battle.players.find(p => p.user._id === user._id);
+      const myLang = myPlayer?.language || 'javascript';
+      setLanguage(myLang);
+      
+      // Set initial code
+      const initialCode = myPlayer?.code || 
+                          data.battle.question.starterCode?.[myLang] || 
+                          STARTER_CODE[myLang] || 
+                          '';
+      setMyCode(initialCode);
+      
+      // Identify opponent
+      const opp = data.battle.players.find(p => p.user._id !== user._id);
       setOpponent(opp);
+      setOpponentCode(opp?.code || '');
       
       // Check ready status
-      const myPlayer = data.battle.players.find(p => p.user._id === user.id);
       setIsReady(myPlayer?.isReady || false);
       setOpponentReady(opp?.isReady || false);
     });
 
     socketService.onPlayerReady((data) => {
       console.log('👍 Player ready:', data);
-      if (data.userId === user.id) {
+      if (data.userId === user._id) {
         setIsReady(true);
       } else {
         setOpponentReady(true);
@@ -94,13 +123,22 @@ const BattleRoom = () => {
       }, 1000);
     });
 
-    socketService.onOpponentCodeChange((data) => {
+    // Listen for opponent code sync (full code)
+    socketService.onOpponentCodeSync((data) => {
+      setOpponentCode(data.code);
       setOpponentStatus(prev => ({ ...prev, codeLength: data.codeLength }));
+    });
+
+    // Listen for language changes
+    socketService.onLanguageChanged((data) => {
+      if (data.userId !== user._id) {
+        toast.success(`Opponent changed language to ${data.language}`);
+      }
     });
 
     socketService.onPlayerSubmitted((data) => {
       console.log('📝 Player submitted:', data);
-      if (data.userId !== user.id) {
+      if (data.userId !== user._id) {
         setOpponentStatus(prev => ({ ...prev, submitted: true }));
         toast.success('Opponent submitted their solution!');
       }
@@ -113,7 +151,7 @@ const BattleRoom = () => {
       setWinner(data.winner);
       
       if (data.winner) {
-        if (data.winner._id === user.id) {
+        if (data.winner._id === user._id) {
           toast.success('🎉 Victory! You won the battle!', { duration: 5000 });
         } else {
           toast.error('💔 Defeat! Better luck next time!', { duration: 5000 });
@@ -131,22 +169,33 @@ const BattleRoom = () => {
     // Cleanup
     return () => {
       clearInterval(timerRef.current);
+      if (codeSyncRef.current) {
+        clearTimeout(codeSyncRef.current);
+      }
       socketService.offBattleEvents();
     };
   }, [battleId, user, navigate]);
 
   const handleReady = () => {
-    socketService.markReady(battleId, user.id);
+    socketService.markReady(battleId, user._id);
   };
 
-  const handleCodeChange = (e) => {
-    const newCode = e.target.value;
-    setCode(newCode);
+  const handleCodeChange = (newCode) => {
+    setMyCode(newCode);
+    syncCode(newCode);
+  };
+
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
     
-    // Throttle code change events (send every 2 seconds)
-    if (battleStarted && !submitted) {
-      socketService.sendCodeChange(battleId, user.id, newCode);
-    }
+    // Load starter code for new language
+    const newStarterCode = question.starterCode?.[newLanguage] || STARTER_CODE[newLanguage] || '';
+    setMyCode(newStarterCode);
+    
+    // Notify server and opponent
+    socketService.sendLanguageChange(battleId, user._id, newLanguage);
+    
+    toast.success(`Switched to ${newLanguage}`);
   };
 
   const handleSubmit = () => {
@@ -164,7 +213,7 @@ const BattleRoom = () => {
       status: testsPassed === totalTests ? 'passed' : 'failed'
     };
 
-    socketService.submitSolution(battleId, user.id, code, result);
+    socketService.submitSolution(battleId, user._id, myCode, result);
     setSubmitted(true);
     toast.success('Solution submitted!');
   };
@@ -235,10 +284,10 @@ const BattleRoom = () => {
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <div className="bg-gray-800 rounded-lg p-12 text-center max-w-md border-2 border-purple-500">
             <div className="text-6xl mb-4">
-              {winner?._id === user.id ? '🏆' : winner ? '💔' : '🤝'}
+              {winner?._id === user._id ? '🏆' : winner ? '💔' : '🤝'}
             </div>
             <h2 className="text-4xl font-bold text-white mb-4">
-              {winner?._id === user.id ? 'Victory!' : winner ? 'Defeat!' : 'Draw!'}
+              {winner?._id === user._id ? 'Victory!' : winner ? 'Defeat!' : 'Draw!'}
             </h2>
             {winner && (
               <p className="text-xl text-gray-300 mb-6">
@@ -329,16 +378,41 @@ const BattleRoom = () => {
             </div>
           </div>
 
-          {/* Code Editor */}
-          <div className="flex-1 flex flex-col bg-gray-900 p-4">
-            <textarea
-              value={code}
-              onChange={handleCodeChange}
-              disabled={!battleStarted || submitted}
-              className="flex-1 bg-gray-800 text-white font-mono p-4 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-              placeholder="// Write your code here..."
-              spellCheck="false"
-            />
+          {/* Language Selector & Code Editor */}
+          <div className="flex-1 flex flex-col">
+            {/* Language Selector */}
+            <div className="bg-gray-800 border-b border-gray-700 px-4 py-2">
+              <div className="flex items-center justify-between">
+                <select
+                  value={language}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
+                  disabled={!battleStarted || submitted}
+                  className="bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                >
+                  {LANGUAGE_OPTIONS.map(lang => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.icon} {lang.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-xs text-gray-400">
+                  {myCode?.length || 0} characters
+                </div>
+              </div>
+            </div>
+
+            {/* Monaco Code Comparison */}
+            <div className="flex-1">
+              <CodeComparison
+                myCode={myCode}
+                opponentCode={opponentCode}
+                language={language}
+                onMyCodeChange={handleCodeChange}
+                myUsername={user.username}
+                opponentUsername={opponent?.user?.username || 'Opponent'}
+                battleStarted={battleStarted}
+              />
+            </div>
           </div>
 
           {/* Action Buttons */}
