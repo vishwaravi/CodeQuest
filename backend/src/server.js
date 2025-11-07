@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import testRoutes from './routes/testRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import questionRoutes from './routes/questionRoutes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
 // Load environment variables
@@ -47,6 +48,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/', testRoutes);
 app.use('/api', testRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/questions', questionRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {

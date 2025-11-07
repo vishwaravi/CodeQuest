@@ -6,6 +6,9 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import Questions from './pages/Questions';
+import QuestionDetail from './pages/QuestionDetail';
+import QuestionForm from './pages/QuestionForm';
 import TestConnection from './pages/TestConnection';
 
 function App() {
@@ -29,11 +32,29 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/test" element={<TestConnection />} />
+            <Route path="/questions" element={<Questions />} />
+            <Route path="/questions/:id" element={<QuestionDetail />} />
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/questions/new"
+              element={
+                <ProtectedRoute>
+                  <QuestionForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/questions/edit/:id"
+              element={
+                <ProtectedRoute>
+                  <QuestionForm />
                 </ProtectedRoute>
               }
             />

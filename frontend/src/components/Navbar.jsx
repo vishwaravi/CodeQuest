@@ -41,6 +41,13 @@ const Navbar = () => {
             )}
             
             <Link
+              to="/questions"
+              className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
+            >
+              Questions
+            </Link>
+            
+            <Link
               to="/test"
               className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
             >

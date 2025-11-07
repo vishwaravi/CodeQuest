@@ -68,6 +68,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt
@@ -109,6 +114,7 @@ userSchema.methods.getPublicProfile = function () {
     xp: this.xp,
     stats: this.stats,
     avatar: this.avatar,
+    role: this.role,
     createdAt: this.createdAt,
   };
 };

@@ -86,6 +86,42 @@ export const apiService = {
     });
     return response.data;
   },
+
+  // Question endpoints
+  getQuestions: async (params = {}) => {
+    const response = await api.get('/api/questions', { params });
+    return response.data;
+  },
+
+  getQuestion: async (id) => {
+    const response = await api.get(`/api/questions/${id}`);
+    return response.data;
+  },
+
+  getRandomQuestion: async (difficulty) => {
+    const response = await api.get(`/api/questions/random/${difficulty}`);
+    return response.data;
+  },
+
+  createQuestion: async (questionData) => {
+    const response = await api.post('/api/questions', questionData);
+    return response.data;
+  },
+
+  updateQuestion: async (id, questionData) => {
+    const response = await api.put(`/api/questions/${id}`, questionData);
+    return response.data;
+  },
+
+  deleteQuestion: async (id) => {
+    const response = await api.delete(`/api/questions/${id}`);
+    return response.data;
+  },
+
+  getQuestionStats: async () => {
+    const response = await api.get('/api/questions/stats');
+    return response.data;
+  },
 };
 
 export default api;
