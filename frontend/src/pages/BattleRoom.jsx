@@ -12,6 +12,9 @@ const BattleRoom = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  // Get userId - handle both user.id (from getPublicProfile) and user._id
+  const userId = user?.id || user?._id;
+  
   const [battle, setBattle] = useState(null);
   const [question, setQuestion] = useState(null);
   const [opponent, setOpponent] = useState(null);
@@ -39,23 +42,26 @@ const BattleRoom = () => {
     }
 
     codeSyncRef.current = setTimeout(() => {
-      if (battleStarted && !submitted) {
-        socketService.sendCodeSync(battleId, user._id, code, code.length);
+      if (battleStarted && !submitted && userId) {
+        socketService.sendCodeSync(battleId, userId, code, code.length);
       }
     }, 500); // 500ms debounce
-  }, [battleId, user, battleStarted, submitted]);
+  }, [battleId, userId, battleStarted, submitted]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !userId) {
       navigate('/login');
       return;
     }
+
+    console.log('👤 BattleRoom - Current User:', user);
+    console.log('🆔 User ID:', userId);
 
     // Connect socket
     socketService.connect();
 
     // Join battle room
-    socketService.joinBattle(battleId, user._id);
+    socketService.joinBattle(battleId, userId);
 
     // Listen to battle events
     socketService.onBattleJoined((data) => {
@@ -64,7 +70,10 @@ const BattleRoom = () => {
       setQuestion(data.question || data.battle.question);
       
       // Get my player data
-      const myPlayer = data.battle.players.find(p => p.user._id === user._id);
+      const myPlayer = data.battle.players.find(p => {
+        const playerId = p.user._id || p.user.id || p.user;
+        return playerId.toString() === userId.toString();
+      });
       const myLang = myPlayer?.language || data.playerData?.language || 'javascript';
       setLanguage(myLang);
       
@@ -78,7 +87,10 @@ const BattleRoom = () => {
       setMyCode(initialCode);
       
       // Identify opponent
-      const opp = data.opponent || data.battle.players.find(p => p.user._id !== user._id);
+      const opp = data.opponent || data.battle.players.find(p => {
+        const playerId = p.user._id || p.user.id || p.user;
+        return playerId.toString() !== userId.toString();
+      });
       setOpponent(opp);
       setOpponentCode(opp?.code || '');
       
@@ -126,7 +138,7 @@ const BattleRoom = () => {
 
     socketService.onPlayerReady((data) => {
       console.log('👍 Player ready:', data);
-      if (data.userId === user._id) {
+      if (data.userId === userId) {
         setIsReady(true);
       } else {
         setOpponentReady(true);
@@ -171,14 +183,14 @@ const BattleRoom = () => {
 
     // Listen for language changes
     socketService.onLanguageChanged((data) => {
-      if (data.userId !== user._id) {
+      if (data.userId !== userId) {
         toast.success(`Opponent changed language to ${data.language}`);
       }
     });
 
     socketService.onPlayerSubmitted((data) => {
       console.log('📝 Player submitted:', data);
-      if (data.userId !== user._id) {
+      if (data.userId !== userId) {
         setOpponentStatus(prev => ({ ...prev, submitted: true }));
         toast.success('Opponent submitted their solution!');
       }
@@ -191,13 +203,15 @@ const BattleRoom = () => {
       setWinner(data.winner);
       
       if (data.reason === 'forfeit') {
-        if (data.winner._id === user._id) {
+        const winnerId = data.winner?._id || data.winner?.id;
+        if (winnerId === userId) {
           toast.success('You win by forfeit! 🏆', { duration: 5000 });
         } else {
           toast.error('You lost the battle', { duration: 5000 });
         }
       } else if (data.winner) {
-        if (data.winner._id === user._id) {
+        const winnerId = data.winner._id || data.winner.id;
+        if (winnerId === userId) {
           toast.success('🎉 Victory! You won the battle!', { duration: 5000 });
         } else {
           toast.error('💔 Defeat! Better luck next time!', { duration: 5000 });
@@ -235,10 +249,10 @@ const BattleRoom = () => {
       }
       socketService.offBattleEvents();
     };
-  }, [battleId, user, navigate]);
+  }, [battleId, user, userId, navigate]);
 
   const handleReady = () => {
-    socketService.markReady(battleId, user._id);
+    socketService.markReady(battleId, userId);
   };
 
   const handleCodeChange = (newCode) => {
@@ -254,7 +268,7 @@ const BattleRoom = () => {
     setMyCode(newStarterCode);
     
     // Notify server and opponent
-    socketService.sendLanguageChange(battleId, user._id, newLanguage);
+    socketService.sendLanguageChange(battleId, userId, newLanguage);
     
     toast.success(`Switched to ${newLanguage}`);
   };
@@ -274,7 +288,7 @@ const BattleRoom = () => {
       status: testsPassed === totalTests ? 'passed' : 'failed'
     };
 
-    socketService.submitSolution(battleId, user._id, myCode, result);
+    socketService.submitSolution(battleId, userId, myCode, result);
     setSubmitted(true);
     toast.success('Solution submitted!');
   };
@@ -284,7 +298,7 @@ const BattleRoom = () => {
   };
 
   const confirmLeaveBattle = () => {
-    socketService.leaveBattle(battleId, user._id);
+    socketService.leaveBattle(battleId, userId);
     setShowLeaveModal(false);
     toast.success('Leaving battle...');
     setTimeout(() => {
@@ -401,10 +415,20 @@ const BattleRoom = () => {
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <div className="bg-gray-800 rounded-lg p-12 text-center max-w-md border-2 border-purple-500">
             <div className="text-6xl mb-4">
-              {winner?._id === user._id ? '🏆' : winner ? '💔' : '🤝'}
+              {(() => {
+                const winnerId = winner?._id || winner?.id;
+                if (winnerId === userId) return '🏆';
+                if (winner) return '💔';
+                return '🤝';
+              })()}
             </div>
             <h2 className="text-4xl font-bold text-white mb-4">
-              {winner?._id === user._id ? 'Victory!' : winner ? 'Defeat!' : 'Draw!'}
+              {(() => {
+                const winnerId = winner?._id || winner?.id;
+                if (winnerId === userId) return 'Victory!';
+                if (winner) return 'Defeat!';
+                return 'Draw!';
+              })()}
             </h2>
             {winner && (
               <p className="text-xl text-gray-300 mb-6">

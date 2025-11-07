@@ -12,15 +12,18 @@ const Matchmaking = () => {
   const [searching, setSearching] = useState(false);
   const [queueStatus, setQueueStatus] = useState(null);
   const [stats, setStats] = useState(null);
+  
+  // Get userId - handle both user.id (from getPublicProfile) and user._id
+  const userId = user?.id || user?._id;
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !userId) {
       navigate('/login');
       return;
     }
 
     console.log('👤 Matchmaking - Current User:', user);
-    console.log('🆔 User ID:', user.id);
+    console.log('🆔 User ID:', userId);
 
     // Connect socket
     socketService.connect();
@@ -67,12 +70,12 @@ const Matchmaking = () => {
 
     // Cleanup
     return () => {
-      if (searching && user?.id) {
-        socketService.leaveQueue(user.id);
+      if (searching && userId) {
+        socketService.leaveQueue(userId);
       }
       socketService.offBattleEvents();
     };
-  }, [user, navigate]);
+  }, [user, userId, navigate]);
 
   const checkActiveBattle = async () => {
     try {
@@ -96,21 +99,13 @@ const Matchmaking = () => {
   };
 
   const handleFindMatch = () => {
-    if (!user || !user.id) {
-      toast.error('User not loaded. Please refresh the page.');
-      return;
-    }
-
     if (searching) {
       // Cancel search
-      console.log('🛑 Canceling search for user:', user.id);
-      socketService.leaveQueue(user.id);
+      socketService.leaveQueue(userId);
       setSearching(false);
     } else {
       // Start search
-      console.log('🎮 Starting search for user:', user.id, 'Difficulty:', difficulty);
-      console.log('📋 Full user object:', user);
-      socketService.joinQueue(user.id, difficulty);
+      socketService.joinQueue(userId, difficulty);
       setSearching(true);
     }
   };
