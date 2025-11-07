@@ -6,6 +6,7 @@ class SocketService {
   constructor() {
     this.socket = null;
     this.connected = false;
+    this.battleListeners = new Map(); // Store battle-specific listeners
   }
 
   // Initialize socket connection
@@ -44,6 +45,114 @@ class SocketService {
 
     this.socket.on('welcome', (data) => {
       console.log('👋 Welcome message:', data);
+    });
+  }
+
+  // Battle-related methods
+  
+  // Join matchmaking queue
+  joinQueue(userId, difficulty) {
+    this.socket.emit('queue:join', { userId, difficulty });
+  }
+
+  // Leave matchmaking queue
+  leaveQueue(userId) {
+    this.socket.emit('queue:leave', { userId });
+  }
+
+  // Join battle room
+  joinBattle(battleId, userId) {
+    this.socket.emit('battle:join', { battleId, userId });
+  }
+
+  // Mark player as ready
+  markReady(battleId, userId) {
+    this.socket.emit('battle:ready', { battleId, userId });
+  }
+
+  // Send code change
+  sendCodeChange(battleId, userId, code) {
+    this.socket.emit('battle:code-change', { battleId, userId, code });
+  }
+
+  // Submit solution
+  submitSolution(battleId, userId, code, result) {
+    this.socket.emit('battle:submit', { battleId, userId, code, result });
+  }
+
+  // Listen to battle events
+  onQueueJoined(callback) {
+    this.socket.on('queue:joined', callback);
+  }
+
+  onQueueLeft(callback) {
+    this.socket.on('queue:left', callback);
+  }
+
+  onQueueError(callback) {
+    this.socket.on('queue:error', callback);
+  }
+
+  onQueueStatus(callback) {
+    this.socket.on('queue:status', callback);
+  }
+
+  onBattleMatched(callback) {
+    this.socket.on('battle:matched', callback);
+  }
+
+  onBattleJoined(callback) {
+    this.socket.on('battle:joined', callback);
+  }
+
+  onBattleError(callback) {
+    this.socket.on('battle:error', callback);
+  }
+
+  onPlayerReady(callback) {
+    this.socket.on('battle:player-ready', callback);
+  }
+
+  onCountdown(callback) {
+    this.socket.on('battle:countdown', callback);
+  }
+
+  onBattleStart(callback) {
+    this.socket.on('battle:start', callback);
+  }
+
+  onOpponentCodeChange(callback) {
+    this.socket.on('battle:opponent-code-change', callback);
+  }
+
+  onPlayerSubmitted(callback) {
+    this.socket.on('battle:player-submitted', callback);
+  }
+
+  onBattleCompleted(callback) {
+    this.socket.on('battle:completed', callback);
+  }
+
+  // Remove battle event listeners
+  offBattleEvents() {
+    const events = [
+      'queue:joined',
+      'queue:left',
+      'queue:error',
+      'queue:status',
+      'battle:matched',
+      'battle:joined',
+      'battle:error',
+      'battle:player-ready',
+      'battle:countdown',
+      'battle:start',
+      'battle:opponent-code-change',
+      'battle:player-submitted',
+      'battle:completed'
+    ];
+
+    events.forEach(event => {
+      this.socket.off(event);
     });
   }
 

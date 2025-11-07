@@ -7,6 +7,8 @@ import connectDB from './config/database.js';
 import testRoutes from './routes/testRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
+import battleRoutes from './routes/battleRoutes.js';
+import { initializeBattleSocket } from './sockets/battleSocket.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
 // Load environment variables
@@ -49,22 +51,10 @@ app.use('/', testRoutes);
 app.use('/api', testRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/battles', battleRoutes);
 
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`);
-
-  // Test event
-  socket.emit('welcome', {
-    message: 'Welcome to CodeQuest!',
-    socketId: socket.id,
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log(`🔴 Client disconnected: ${socket.id}`);
-  });
-});
+// Initialize Battle Socket handlers
+initializeBattleSocket(io);
 
 // Error Handlers (must be last)
 app.use(notFoundHandler);

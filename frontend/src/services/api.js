@@ -122,6 +122,42 @@ export const apiService = {
     const response = await api.get('/api/questions/stats');
     return response.data;
   },
+
+  // Battle endpoints
+  getBattleHistory: async (limit = 20) => {
+    const response = await api.get('/api/battles/history', { params: { limit } });
+    return response.data;
+  },
+
+  getBattleDetails: async (battleId) => {
+    const response = await api.get(`/api/battles/${battleId}`);
+    return response.data;
+  },
+
+  getBattleStats: async () => {
+    const response = await api.get('/api/battles/stats');
+    return response.data;
+  },
+
+  getActiveBattle: async () => {
+    const response = await api.get('/api/battles/active');
+    return response.data;
+  },
+
+  getQueueStatus: async () => {
+    const response = await api.get('/api/battles/queue/status');
+    return response.data;
+  },
+
+  getUserQueuePosition: async () => {
+    const response = await api.get('/api/battles/queue/position');
+    return response.data;
+  },
+
+  getLeaderboard: async (limit = 50) => {
+    const response = await api.get('/api/battles/leaderboard/top', { params: { limit } });
+    return response.data;
+  },
 };
 
 export default api;

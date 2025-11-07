@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import Questions from './pages/Questions';
 import QuestionDetail from './pages/QuestionDetail';
 import QuestionForm from './pages/QuestionForm';
+import Matchmaking from './pages/Matchmaking';
+import BattleRoom from './pages/BattleRoom';
 import TestConnection from './pages/TestConnection';
 
 function App() {
@@ -34,6 +36,22 @@ function App() {
             <Route path="/test" element={<TestConnection />} />
             <Route path="/questions" element={<Questions />} />
             <Route path="/questions/:id" element={<QuestionDetail />} />
+            <Route
+              path="/matchmaking"
+              element={
+                <ProtectedRoute>
+                  <Matchmaking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/battle/:battleId"
+              element={
+                <ProtectedRoute>
+                  <BattleRoom />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard"
               element={

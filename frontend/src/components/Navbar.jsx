@@ -31,21 +31,30 @@ const Navbar = () => {
               Home
             </Link>
             
-            {isAuthenticated && (
-              <Link
-                to="/dashboard"
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
-              >
-                Dashboard
-              </Link>
-            )}
-            
             <Link
               to="/questions"
               className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
             >
               Questions
             </Link>
+            
+            {isAuthenticated && (
+              <>
+                <Link
+                  to="/matchmaking"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:from-purple-700 hover:to-pink-700 transition"
+                >
+                  ⚔️ Battle
+                </Link>
+                
+                <Link
+                  to="/dashboard"
+                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
+                >
+                  Dashboard
+                </Link>
+              </>
+            )}
             
             <Link
               to="/test"
