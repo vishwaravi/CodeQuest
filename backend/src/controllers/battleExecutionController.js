@@ -163,13 +163,24 @@ export const submitSolution = async (req, res) => {
 
     // Check if both players have submitted
     const bothSubmitted = battle.players.every(p => p.submitted);
+    console.log('📊 Submission status:', {
+      player1Submitted: battle.players[0].submitted,
+      player2Submitted: battle.players[1].submitted,
+      bothSubmitted
+    });
+    
     let winner = null;
     let winnerData = null;
 
     if (bothSubmitted) {
       console.log('🏁 Both players submitted - determining winner...');
+      console.log('📊 Player 1 tests passed:', battle.players[0].testsPassed);
+      console.log('📊 Player 2 tests passed:', battle.players[1].testsPassed);
+      
       winner = await battle.determineWinner();
       await battle.save();
+      
+      console.log('🏆 Winner determined:', winner);
       
       // Get winner user data
       if (winner) {

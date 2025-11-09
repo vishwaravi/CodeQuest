@@ -519,6 +519,7 @@ export const initializeBattleSocket = (io) => {
     // Solution submitted (notify opponent)
     socket.on('submission:complete', async ({ battleId, userId, results, bothSubmitted, winner }) => {
       console.log(`📤 User ${userId} submitted solution in battle ${battleId}`);
+      console.log('📊 Submission data:', { bothSubmitted, winner });
       
       // Notify opponent about submission
       socket.to(battleId).emit('opponent:submitted', {
@@ -529,12 +530,15 @@ export const initializeBattleSocket = (io) => {
 
       // If both submitted, broadcast battle completion
       if (bothSubmitted) {
+        console.log('🎉 Both players have submitted! Broadcasting battle:completed event...');
+        console.log('🏆 Winner data being sent:', winner);
+        
         io.to(battleId).emit('battle:completed', {
           winner,
           finalResults: true
         });
         
-        console.log(`🏁 Battle ${battleId} completed - Winner: ${winner || 'Draw'}`);
+        console.log(`🏁 Battle ${battleId} completed - Winner: ${winner ? winner.username || winner : 'Draw'}`);
         matchmakingQueue.completeBattle(battleId);
       }
     });
