@@ -143,7 +143,8 @@ const BattleRoom = () => {
       console.log('📊 data.userId:', data.userId);
       console.log('📊 data.allReady:', data.allReady);
       
-      if (data.userId === userId) {
+      // Update ready state for the player who clicked
+      if (data.userId.toString() === userId.toString()) {
         console.log('✅ I am ready!');
         setIsReady(true);
       } else {
@@ -152,7 +153,10 @@ const BattleRoom = () => {
       }
       
       if (data.allReady) {
-        console.log('🎉 ALL PLAYERS READY - Waiting for countdown...');
+        console.log('🎉 ALL PLAYERS READY - Both players confirmed ready!');
+        // Ensure both states are set to ready when allReady is true
+        setIsReady(true);
+        setOpponentReady(true);
         toast.success('Both players ready! Starting battle...');
         
         // Fallback: If countdown doesn't start in 5 seconds, manually start battle
