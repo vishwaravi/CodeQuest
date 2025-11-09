@@ -34,6 +34,7 @@ const BattleRoom = () => {
   
   const timerRef = useRef(null);
   const codeSyncRef = useRef(null);
+  const countdownTimeoutRef = useRef(null);
 
   // Debounced code sync
   const syncCode = useCallback((code) => {
@@ -137,19 +138,56 @@ const BattleRoom = () => {
     });
 
     socketService.onPlayerReady((data) => {
-      console.log('👍 Player ready:', data);
+      console.log('👍 Player ready event received:', data);
+      console.log('📊 Current userId:', userId);
+      console.log('📊 data.userId:', data.userId);
+      console.log('📊 data.allReady:', data.allReady);
+      
       if (data.userId === userId) {
+        console.log('✅ I am ready!');
         setIsReady(true);
       } else {
+        console.log('✅ Opponent is ready!');
         setOpponentReady(true);
       }
       
       if (data.allReady) {
+        console.log('🎉 ALL PLAYERS READY - Waiting for countdown...');
         toast.success('Both players ready! Starting battle...');
+        
+        // Fallback: If countdown doesn't start in 5 seconds, manually start battle
+        countdownTimeoutRef.current = setTimeout(() => {
+          console.warn('⚠️ Countdown not received! Manually starting battle...');
+          if (!battleStarted) {
+            console.log('🚀 FALLBACK: Setting battleStarted to TRUE');
+            setBattleStarted(true);
+            setTimeRemaining(900); // 15 minutes
+            toast.success('Battle started!', { icon: '🚀' });
+            
+            // Start timer
+            timerRef.current = setInterval(() => {
+              setTimeRemaining(prev => {
+                if (prev <= 1) {
+                  clearInterval(timerRef.current);
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }
+        }, 5000); // 5 second timeout
       }
     });
 
     socketService.onCountdown((data) => {
+      console.log('⏰ Countdown event received:', data.count);
+      
+      // Clear the fallback timeout since countdown started
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+        countdownTimeoutRef.current = null;
+      }
+      
       setCountdown(data.count);
       if (data.count > 0) {
         toast.success(`${data.count}...`, { duration: 900 });
@@ -250,9 +288,12 @@ const BattleRoom = () => {
       if (codeSyncRef.current) {
         clearTimeout(codeSyncRef.current);
       }
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+      }
       socketService.offBattleEvents();
     };
-  }, [battleId, user, userId, navigate]);
+  }, [battleId, user, userId, navigate, battleStarted]);
 
   const handleReady = () => {
     socketService.markReady(battleId, userId);
