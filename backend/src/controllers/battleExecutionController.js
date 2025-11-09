@@ -134,7 +134,7 @@ export const submitSolution = async (req, res) => {
     }
 
     // Check if already submitted
-    if (battle.players[playerIndex].submitted) {
+    if (battle.players[playerIndex].submittedAt) {
       return res.status(400).json({
         success: false,
         message: 'You have already submitted a solution',
@@ -152,7 +152,6 @@ export const submitSolution = async (req, res) => {
     // Update battle with submission
     battle.players[playerIndex].code = code;
     battle.players[playerIndex].language = language;
-    battle.players[playerIndex].submitted = true;
     battle.players[playerIndex].submittedAt = new Date();
     battle.players[playerIndex].testsPassed = executionResult.summary.passed;
     battle.players[playerIndex].executionTime = parseFloat(executionResult.summary.averageTime);
@@ -167,15 +166,15 @@ export const submitSolution = async (req, res) => {
       .populate('players.user', 'username rating avatar');
 
     // Check if both players have submitted
-    const bothSubmitted = freshBattle.players.every(p => p.submitted === true);
+    const bothSubmitted = freshBattle.players.every(p => p.submittedAt != null);
     console.log('📊 Submission status:', {
       player1: {
         userId: freshBattle.players[0].user._id.toString(),
-        submitted: freshBattle.players[0].submitted
+        submittedAt: freshBattle.players[0].submittedAt
       },
       player2: {
         userId: freshBattle.players[1].user._id.toString(),
-        submitted: freshBattle.players[1].submitted
+        submittedAt: freshBattle.players[1].submittedAt
       },
       bothSubmitted
     });
