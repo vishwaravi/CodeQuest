@@ -29,10 +29,12 @@ export const executeCode = async (req, res) => {
       });
     }
 
-    // Check if user is participant
-    const isParticipant = battle.players.some(
-      p => p.user.toString() === userId.toString()
-    );
+    // Check if user is participant (handle both populated and non-populated user)
+    const isParticipant = battle.players.some(p => {
+      const playerId = p.user._id || p.user;
+      return playerId.toString() === userId.toString();
+    });
+    
     if (!isParticipant) {
       return res.status(403).json({
         success: false,
@@ -110,10 +112,12 @@ export const submitSolution = async (req, res) => {
       });
     }
 
-    // Check if user is participant
-    const playerIndex = battle.players.findIndex(
-      p => p.user.toString() === userId.toString()
-    );
+    // Check if user is participant (handle both populated and non-populated user)
+    const playerIndex = battle.players.findIndex(p => {
+      const playerId = p.user._id || p.user;
+      return playerId.toString() === userId.toString();
+    });
+    
     if (playerIndex === -1) {
       return res.status(403).json({
         success: false,
