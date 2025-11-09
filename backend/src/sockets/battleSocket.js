@@ -495,6 +495,50 @@ export const initializeBattleSocket = (io) => {
       }
     });
 
+    // Code execution started (notify opponent)
+    socket.on('execution:start', ({ battleId, userId }) => {
+      console.log(`⚡ User ${userId} started code execution in battle ${battleId}`);
+      
+      socket.to(battleId).emit('opponent:execution-start', {
+        userId
+      });
+    });
+
+    // Code execution completed (share results with opponent)
+    socket.on('execution:complete', ({ battleId, userId, results }) => {
+      console.log(`✅ User ${userId} completed execution in battle ${battleId}`);
+      
+      socket.to(battleId).emit('opponent:execution-complete', {
+        userId,
+        testsPassed: results.summary?.passed,
+        totalTests: results.summary?.totalTests,
+        percentage: results.summary?.percentage
+      });
+    });
+
+    // Solution submitted (notify opponent)
+    socket.on('submission:complete', async ({ battleId, userId, results, bothSubmitted, winner }) => {
+      console.log(`📤 User ${userId} submitted solution in battle ${battleId}`);
+      
+      // Notify opponent about submission
+      socket.to(battleId).emit('opponent:submitted', {
+        userId,
+        testsPassed: results.summary?.passed,
+        totalTests: results.summary?.totalTests
+      });
+
+      // If both submitted, broadcast battle completion
+      if (bothSubmitted) {
+        io.to(battleId).emit('battle:completed', {
+          winner,
+          finalResults: true
+        });
+        
+        console.log(`🏁 Battle ${battleId} completed - Winner: ${winner || 'Draw'}`);
+        matchmakingQueue.completeBattle(battleId);
+      }
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
       console.log(`🔌 Socket disconnected: ${socket.id}`);

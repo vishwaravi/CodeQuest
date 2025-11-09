@@ -5,6 +5,7 @@ import { apiService } from '../services/api';
 import socketService from '../services/socket';
 import toast from 'react-hot-toast';
 import CodeComparison from '../components/CodeComparison';
+import ExecutionResultsModal from '../components/ExecutionResultsModal';
 import { LANGUAGE_OPTIONS, STARTER_CODE } from '../constants/languages';
 
 const BattleRoom = () => {
@@ -31,6 +32,10 @@ const BattleRoom = () => {
   const [winner, setWinner] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [executionResults, setExecutionResults] = useState(null);
+  const [showResultsModal, setShowResultsModal] = useState(false);
   
   const timerRef = useRef(null);
   const codeSyncRef = useRef(null);
@@ -286,6 +291,23 @@ const BattleRoom = () => {
       toast.error(error.message);
     });
 
+    // Execution events
+    socketService.onOpponentExecutionStart((data) => {
+      toast(`${opponent?.username || 'Opponent'} is running their code...`, { icon: '⚡' });
+    });
+
+    socketService.onOpponentExecutionComplete((data) => {
+      toast.success(
+        `${opponent?.username || 'Opponent'} ran code: ${data.testsPassed}/${data.totalTests} tests passed (${data.percentage}%)`,
+        { duration: 4000 }
+      );
+    });
+
+    socketService.onOpponentSubmitted((data) => {
+      setOpponentStatus(prev => ({ ...prev, submitted: true }));
+      toast(`${opponent?.username || 'Opponent'} submitted their solution!`, { icon: '📤' });
+    });
+
     // Cleanup
     return () => {
       clearInterval(timerRef.current);
@@ -321,24 +343,84 @@ const BattleRoom = () => {
     toast.success(`Switched to ${newLanguage}`);
   };
 
-  const handleSubmit = () => {
+  const handleRunCode = async () => {
+    if (!myCode.trim()) {
+      toast.error('Please write some code first!');
+      return;
+    }
+
+    setExecuting(true);
+    socketService.emitExecutionStart(battleId, userId);
+    
+    try {
+      toast.loading('Running your code...', { id: 'execution' });
+      
+      const response = await apiService.executeCode(battleId, myCode, language);
+      
+      setExecutionResults(response.data);
+      setShowResultsModal(true);
+      
+      socketService.emitExecutionComplete(battleId, userId, response.data);
+      
+      toast.success(
+        `${response.data.summary.passed}/${response.data.summary.totalTests} tests passed!`,
+        { id: 'execution' }
+      );
+    } catch (error) {
+      console.error('Execution error:', error);
+      toast.error(error.response?.data?.message || 'Failed to execute code', { id: 'execution' });
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (submitted) return;
 
-    // Simple test case execution simulation
-    // In Phase 6, we'll integrate Judge0 for real execution
-    const testsPassed = Math.floor(Math.random() * (question.testCases?.length || 5));
-    const totalTests = question.testCases?.length || 5;
-    
-    const result = {
-      testsPassed,
-      totalTests,
-      executionTime: Math.floor(Math.random() * 1000) + 100,
-      status: testsPassed === totalTests ? 'passed' : 'failed'
-    };
+    if (!myCode.trim()) {
+      toast.error('Please write some code first!');
+      return;
+    }
 
-    socketService.submitSolution(battleId, userId, myCode, result);
-    setSubmitted(true);
-    toast.success('Solution submitted!');
+    const confirmed = window.confirm(
+      'Are you sure you want to submit? This will run your code against all test cases (including hidden ones).'
+    );
+    
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    
+    try {
+      toast.loading('Submitting your solution...', { id: 'submission' });
+      
+      const response = await apiService.submitSolution(battleId, myCode, language);
+      
+      setExecutionResults(response.data);
+      setShowResultsModal(true);
+      setSubmitted(true);
+      
+      // Notify opponent via socket
+      socketService.emitSubmissionComplete(
+        battleId,
+        userId,
+        response.data,
+        response.data.bothSubmitted,
+        response.data.winner
+      );
+      
+      if (response.data.bothSubmitted) {
+        setBattleEnded(true);
+        setWinner(response.data.winner);
+        toast.success('Battle completed!', { id: 'submission' });
+      } else {
+        toast.success('Solution submitted! Waiting for opponent...', { id: 'submission' });
+      }
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast.error(error.response?.data?.message || 'Failed to submit solution', { id: 'submission' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleLeaveBattle = () => {
@@ -619,21 +701,42 @@ const BattleRoom = () => {
                 {isReady ? '✅ Ready - Waiting for opponent...' : '👍 Ready to Battle'}
               </button>
             ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={submitted}
-                className={`w-full font-bold py-3 px-6 rounded-lg transition-all ${
-                  submitted
-                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-              >
-                {submitted ? '✅ Submitted - Waiting for results...' : '🚀 Submit Solution'}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleRunCode}
+                  disabled={executing || submitted}
+                  className={`flex-1 font-bold py-3 px-6 rounded-lg transition-all ${
+                    executing || submitted
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {executing ? '⏳ Running...' : '▶️ Run Code'}
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitted || submitting}
+                  className={`flex-1 font-bold py-3 px-6 rounded-lg transition-all ${
+                    submitted || submitting
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  {submitted ? '✅ Submitted' : submitting ? '⏳ Submitting...' : '🚀 Submit'}
+                </button>
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Execution Results Modal */}
+      <ExecutionResultsModal
+        isOpen={showResultsModal}
+        onClose={() => setShowResultsModal(false)}
+        results={executionResults}
+        isSubmission={submitted}
+      />
     </div>
   );
 };

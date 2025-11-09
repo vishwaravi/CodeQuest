@@ -158,6 +158,23 @@ export const apiService = {
     const response = await api.get('/api/battles/leaderboard/top', { params: { limit } });
     return response.data;
   },
+
+  // Code execution endpoints
+  executeCode: async (battleId, code, language) => {
+    const response = await api.post(`/api/battles/${battleId}/execute`, {
+      code,
+      language,
+    });
+    return response.data;
+  },
+
+  submitSolution: async (battleId, code, language) => {
+    const response = await api.post(`/api/battles/${battleId}/submit`, {
+      code,
+      language,
+    });
+    return response.data;
+  },
 };
 
 export default api;

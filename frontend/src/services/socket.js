@@ -95,6 +95,32 @@ class SocketService {
     this.socket.emit('battle:leave', { battleId, userId });
   }
 
+  // Execution events
+  emitExecutionStart(battleId, userId) {
+    this.socket.emit('execution:start', { battleId, userId });
+  }
+
+  emitExecutionComplete(battleId, userId, results) {
+    this.socket.emit('execution:complete', { battleId, userId, results });
+  }
+
+  emitSubmissionComplete(battleId, userId, results, bothSubmitted, winner) {
+    this.socket.emit('submission:complete', { battleId, userId, results, bothSubmitted, winner });
+  }
+
+  // Listen to execution events
+  onOpponentExecutionStart(callback) {
+    this.socket.on('opponent:execution-start', callback);
+  }
+
+  onOpponentExecutionComplete(callback) {
+    this.socket.on('opponent:execution-complete', callback);
+  }
+
+  onOpponentSubmitted(callback) {
+    this.socket.on('opponent:submitted', callback);
+  }
+
   // Listen to battle events
   onQueueJoined(callback) {
     this.socket.on('queue:joined', callback);

@@ -8,6 +8,10 @@ import {
   getUserQueuePosition,
   getLeaderboard
 } from '../controllers/battleController.js';
+import {
+  executeCode,
+  submitSolution
+} from '../controllers/battleExecutionController.js';
 import { protect } from '../middlewares/auth.js';
 
 const router = express.Router();
@@ -35,5 +39,9 @@ router.get('/queue/position', getUserQueuePosition);
 
 // Get leaderboard
 router.get('/leaderboard/top', getLeaderboard);
+
+// Code execution routes
+router.post('/:battleId/execute', executeCode);
+router.post('/:battleId/submit', submitSolution);
 
 export default router;
