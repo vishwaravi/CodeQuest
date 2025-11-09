@@ -20,8 +20,8 @@ export const executeCode = async (req, res) => {
 
     console.log(`🏃 User ${userId} executing code in battle ${battleId}`);
 
-    // Validate battle
-    const battle = await Battle.findById(battleId).populate('question');
+    // Validate battle - use findOne with battleId field (not _id)
+    const battle = await Battle.findOne({ battleId }).populate('question');
     if (!battle) {
       return res.status(404).json({
         success: false,
@@ -98,8 +98,8 @@ export const submitSolution = async (req, res) => {
 
     console.log(`📤 User ${userId} submitting solution in battle ${battleId}`);
 
-    // Validate battle
-    const battle = await Battle.findById(battleId).populate('question');
+    // Validate battle - use findOne with battleId field (not _id)
+    const battle = await Battle.findOne({ battleId }).populate('question');
     if (!battle) {
       return res.status(404).json({
         success: false,
