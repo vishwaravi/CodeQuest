@@ -53,6 +53,8 @@ class ExecutionService {
       };
 
       console.log(`🚀 Submitting code for execution (${language}, ID: ${languageId})`);
+      console.log('📍 URL:', `${this.baseURL}/submissions?base64_encoded=true&wait=false`);
+      console.log('🔑 Headers:', JSON.stringify(this.headers, null, 2));
 
       const response = await axios.post(
         `${this.baseURL}/submissions?base64_encoded=true&wait=false`,
@@ -60,6 +62,7 @@ class ExecutionService {
         { headers: this.headers }
       );
 
+      console.log('✅ Submission successful, token:', response.data.token);
       return response.data.token;
     } catch (error) {
       console.error('❌ Error submitting code:', error.response?.data || error.message);
