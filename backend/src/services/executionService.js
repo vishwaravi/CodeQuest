@@ -9,6 +9,14 @@ import { judge0Config, getLanguageId, judge0Status, executionLimits } from '../c
 class ExecutionService {
   constructor() {
     this.baseURL = judge0Config.apiUrl;
+    
+    // Debug: Log configuration
+    console.log('🔧 Judge0 Config:', {
+      apiUrl: judge0Config.apiUrl,
+      apiKey: judge0Config.apiKey ? `${judge0Config.apiKey.substring(0, 10)}...` : 'NOT SET',
+      apiHost: judge0Config.apiHost,
+    });
+    
     this.headers = judge0Config.apiKey
       ? {
           'Content-Type': 'application/json',
@@ -18,6 +26,8 @@ class ExecutionService {
       : {
           'Content-Type': 'application/json',
         };
+    
+    console.log('📋 Headers configured:', Object.keys(this.headers));
   }
 
   /**
