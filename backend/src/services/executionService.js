@@ -12,8 +12,8 @@ class ExecutionService {
     this.headers = judge0Config.apiKey
       ? {
           'Content-Type': 'application/json',
-          'X-RapidAPI-Key': judge0Config.apiKey,
-          'X-RapidAPI-Host': judge0Config.apiHost,
+          'x-rapidapi-key': judge0Config.apiKey,
+          'x-rapidapi-host': judge0Config.apiHost,
         }
       : {
           'Content-Type': 'application/json',
