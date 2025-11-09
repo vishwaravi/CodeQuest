@@ -3,6 +3,9 @@
  * Language IDs and API settings for code execution
  */
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 export const judge0Config = {
   apiUrl: process.env.JUDGE0_API_URL || 'https://judge0-ce.p.rapidapi.com',
   apiKey: process.env.JUDGE0_API_KEY || '',

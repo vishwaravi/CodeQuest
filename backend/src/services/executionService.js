@@ -1,38 +1,32 @@
 /**
- * 🧠 Code Execution Service
- * Handles code execution using the Judge0 API.
- * Docs: https://judge0.com/
+ * Code Execution Service
+ * Handles code execution via Judge0 API
  */
 
 import axios from 'axios';
-import { 
-  judge0Config, 
-  getLanguageId, 
-  judge0Status, 
-  executionLimits 
-} from '../config/judge0.js';
+import { judge0Config, getLanguageId, judge0Status, executionLimits } from '../config/judge0.js';
 
 class ExecutionService {
   constructor() {
     this.baseURL = judge0Config.apiUrl;
-
-    // Debug Configuration
+    
+    // Debug: Log configuration
     console.log('🔧 Judge0 Config:', {
       apiUrl: judge0Config.apiUrl,
-      apiKey: judge0Config.apiKey 
-        ? `${judge0Config.apiKey.substring(0, 10)}...` 
-        : 'NOT SET',
+      apiKey: judge0Config.apiKey ? `${judge0Config.apiKey.substring(0, 10)}...` : 'NOT SET',
       apiHost: judge0Config.apiHost,
     });
-
-    this.headers = {
-      'Content-Type': 'application/json',
-      ...(judge0Config.apiKey && {
-        'x-rapidapi-key': judge0Config.apiKey,
-        'x-rapidapi-host': judge0Config.apiHost,
-      }),
-    };
-
+    
+    this.headers = judge0Config.apiKey
+      ? {
+          'Content-Type': 'application/json',
+          'x-rapidapi-key': judge0Config.apiKey,
+          'x-rapidapi-host': judge0Config.apiHost,
+        }
+      : {
+          'Content-Type': 'application/json',
+        };
+    
     console.log('📋 Headers configured:', Object.keys(this.headers));
   }
 
@@ -40,14 +34,14 @@ class ExecutionService {
    * Submit code for execution
    * @param {string} code - Source code to execute
    * @param {string} language - Programming language
-   * @param {string} [stdin=''] - Input for the program
-   * @param {number} [timeLimit=executionLimits.timeLimit] - Time limit in seconds
-   * @returns {Promise<string>} Submission token
+   * @param {string} stdin - Input for the program
+   * @param {number} timeLimit - Time limit in seconds
+   * @returns {Promise<string>} Token for checking submission status
    */
   async submitCode(code, language, stdin = '', timeLimit = executionLimits.timeLimit) {
     try {
       const languageId = getLanguageId(language);
-
+      
       const payload = {
         source_code: Buffer.from(code).toString('base64'),
         language_id: languageId,
@@ -58,15 +52,18 @@ class ExecutionService {
         enable_network: executionLimits.enableNetwork,
       };
 
-      const url = `${this.baseURL}/submissions?base64_encoded=true&wait=false`;
+      console.log(`🚀 Submitting code for execution (${language}, ID: ${languageId})`);
+      console.log('📍 URL:', `${this.baseURL}/submissions?base64_encoded=true&wait=false`);
+      console.log('🔑 Headers:', JSON.stringify(this.headers, null, 2));
 
-      console.log(`🚀 Submitting code (${language}, ID: ${languageId})`);
-      console.log('📍 URL:', url);
+      const response = await axios.post(
+        `${this.baseURL}/submissions?base64_encoded=true&wait=false`,
+        payload,
+        { headers: this.headers }
+      );
 
-      const { data } = await axios.post(url, payload, { headers: this.headers });
-
-      console.log('✅ Submission successful, token:', data.token);
-      return data.token;
+      console.log('✅ Submission successful, token:', response.data.token);
+      return response.data.token;
     } catch (error) {
       console.error('❌ Error submitting code:', error.response?.data || error.message);
       throw new Error('Failed to submit code for execution');
@@ -80,98 +77,114 @@ class ExecutionService {
    */
   async getSubmission(token) {
     try {
-      const url = `${this.baseURL}/submissions/${token}?base64_encoded=true`;
-      const { data } = await axios.get(url, { headers: this.headers });
+      const response = await axios.get(
+        `${this.baseURL}/submissions/${token}?base64_encoded=true`,
+        { headers: this.headers }
+      );
 
-      const decode = str => (str ? Buffer.from(str, 'base64').toString() : '');
+      const data = response.data;
 
-      return {
+      // Decode base64 outputs
+      const result = {
         status: data.status,
         statusDescription: judge0Status[data.status.id] || 'Unknown',
         time: data.time,
         memory: data.memory,
-        stdout: decode(data.stdout),
-        stderr: decode(data.stderr),
-        compile_output: decode(data.compile_output),
-        message: decode(data.message),
+        stdout: data.stdout ? Buffer.from(data.stdout, 'base64').toString() : '',
+        stderr: data.stderr ? Buffer.from(data.stderr, 'base64').toString() : '',
+        compile_output: data.compile_output ? Buffer.from(data.compile_output, 'base64').toString() : '',
+        message: data.message ? Buffer.from(data.message, 'base64').toString() : '',
       };
+
+      return result;
     } catch (error) {
-      console.error('❌ Error fetching submission:', error.response?.data || error.message);
+      console.error('❌ Error getting submission:', error.response?.data || error.message);
       throw new Error('Failed to get submission result');
     }
   }
 
   /**
-   * Wait for submission to complete (polling)
+   * Wait for submission to complete (with polling)
    * @param {string} token - Submission token
-   * @param {number} [maxAttempts=10] - Max polling attempts
+   * @param {number} maxAttempts - Maximum polling attempts
    * @returns {Promise<Object>} Final execution result
    */
   async waitForSubmission(token, maxAttempts = 10) {
     for (let i = 0; i < maxAttempts; i++) {
       const result = await this.getSubmission(token);
+      
+      // Status 1 = In Queue, 2 = Processing
+      if (result.status.id > 2) {
+        return result;
+      }
 
-      // Status IDs: 1 = In Queue, 2 = Processing
-      if (result.status.id > 2) return result;
-
-      await new Promise(res => setTimeout(res, 500));
+      // Wait 500ms before next attempt
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    throw new Error('Execution timeout — submission took too long to complete');
+    throw new Error('Execution timeout - took too long to complete');
   }
 
   /**
-   * Execute code and fetch result
+   * Execute code and get result (convenience method)
    * @param {string} code - Source code
    * @param {string} language - Programming language
-   * @param {string} [stdin=''] - Input
+   * @param {string} stdin - Input
    * @returns {Promise<Object>} Execution result
    */
   async executeCode(code, language, stdin = '') {
     const token = await this.submitCode(code, language, stdin);
-    return await this.waitForSubmission(token);
+    const result = await this.waitForSubmission(token);
+    return result;
   }
 
   /**
    * Run code against multiple test cases
    * @param {string} code - Source code
    * @param {string} language - Programming language
-   * @param {Array<{input: string, expectedOutput: string}>} testCases
-   * @returns {Promise<{summary: Object, results: Array}>} Test results summary
+   * @param {Array} testCases - Array of {input, expectedOutput}
+   * @returns {Promise<Object>} Test results
    */
   async runTestCases(code, language, testCases) {
     console.log(`🧪 Running ${testCases.length} test cases for ${language}`);
 
     const results = [];
-    let passed = 0, failed = 0, totalTime = 0, totalMemory = 0;
+    let passed = 0;
+    let failed = 0;
+    let totalTime = 0;
+    let totalMemory = 0;
 
-    for (const [i, testCase] of testCases.entries()) {
-      const testIndex = i + 1;
-      console.log(`   Test ${testIndex}/${testCases.length}: Running...`);
-
+    for (let i = 0; i < testCases.length; i++) {
+      const testCase = testCases[i];
+      
       try {
+        console.log(`   Test ${i + 1}/${testCases.length}: Running...`);
+        
         const result = await this.executeCode(code, language, testCase.input);
+        
+        // Normalize outputs (trim whitespace)
         const actualOutput = (result.stdout || '').trim();
         const expectedOutput = testCase.expectedOutput.trim();
+        
         const isPassed = actualOutput === expectedOutput && result.status.id === 3;
-
+        
         if (isPassed) {
           passed++;
-          console.log(`   ✅ Test ${testIndex}: PASSED (${result.time}s, ${result.memory}KB)`);
+          console.log(`   ✅ Test ${i + 1}: PASSED (${result.time}s, ${result.memory}KB)`);
         } else {
           failed++;
-          console.log(`   ❌ Test ${testIndex}: FAILED`);
+          console.log(`   ❌ Test ${i + 1}: FAILED`);
         }
 
         totalTime += parseFloat(result.time || 0);
         totalMemory += parseInt(result.memory || 0);
 
         results.push({
-          testCaseNumber: testIndex,
+          testCaseNumber: i + 1,
           passed: isPassed,
           input: testCase.input,
-          expectedOutput,
-          actualOutput,
+          expectedOutput: expectedOutput,
+          actualOutput: actualOutput,
           status: result.statusDescription,
           time: result.time,
           memory: result.memory,
@@ -179,10 +192,10 @@ class ExecutionService {
         });
       } catch (error) {
         failed++;
-        console.log(`   ❌ Test ${testIndex}: ERROR - ${error.message}`);
-
+        console.log(`   ❌ Test ${i + 1}: ERROR - ${error.message}`);
+        
         results.push({
-          testCaseNumber: testIndex,
+          testCaseNumber: i + 1,
           passed: false,
           input: testCase.input,
           expectedOutput: testCase.expectedOutput,
@@ -205,7 +218,10 @@ class ExecutionService {
 
     console.log(`📊 Results: ${passed}/${testCases.length} passed (${summary.percentage}%)`);
 
-    return { summary, results };
+    return {
+      summary,
+      results,
+    };
   }
 }
 
