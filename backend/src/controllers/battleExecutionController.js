@@ -160,21 +160,20 @@ export const submitSolution = async (req, res) => {
 
     console.log(`✅ Submission saved: ${executionResult.summary.passed}/${allTestCases.length} tests passed`);
 
-    // Reload battle to get fresh data with all fields
-    const freshBattle = await Battle.findOne({ battleId })
-      .populate('question')
-      .populate('players.user', 'username rating avatar');
+    // Reload battle data to get fresh submission status
+    await battle.populate('question');
+    await battle.populate('players.user', 'username rating avatar');
 
     // Check if both players have submitted
-    const bothSubmitted = freshBattle.players.every(p => p.submittedAt != null);
+    const bothSubmitted = battle.players.every(p => p.submittedAt != null);
     console.log('📊 Submission status:', {
       player1: {
-        userId: freshBattle.players[0].user._id.toString(),
-        submittedAt: freshBattle.players[0].submittedAt
+        userId: battle.players[0].user._id.toString(),
+        submittedAt: battle.players[0].submittedAt
       },
       player2: {
-        userId: freshBattle.players[1].user._id.toString(),
-        submittedAt: freshBattle.players[1].submittedAt
+        userId: battle.players[1].user._id.toString(),
+        submittedAt: battle.players[1].submittedAt
       },
       bothSubmitted
     });
@@ -184,17 +183,17 @@ export const submitSolution = async (req, res) => {
 
     if (bothSubmitted) {
       console.log('🏁 Both players submitted - determining winner...');
-      console.log('📊 Player 1 tests passed:', freshBattle.players[0].testsPassed);
-      console.log('📊 Player 2 tests passed:', freshBattle.players[1].testsPassed);
+      console.log('📊 Player 1 tests passed:', battle.players[0].testsPassed);
+      console.log('📊 Player 2 tests passed:', battle.players[1].testsPassed);
       
-      winner = await freshBattle.determineWinner();
-      await freshBattle.save();
+      winner = await battle.determineWinner();
+      await battle.save();
       
       console.log('🏆 Winner determined:', winner);
       
       // Get winner user data
       if (winner) {
-        const winnerPlayer = freshBattle.players.find(p => p.user._id.toString() === winner.toString());
+        const winnerPlayer = battle.players.find(p => p.user._id.toString() === winner.toString());
         if (winnerPlayer) {
           winnerData = {
             _id: winnerPlayer.user._id,
