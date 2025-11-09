@@ -214,6 +214,11 @@ export const initializeBattleSocket = (io) => {
         if (allReady && (battle.status === 'ready' || battle.status === 'waiting')) {
           console.log(`🎬 Starting countdown for battle ${battleId}`);
           
+          // Check how many clients are in the room
+          const room = io.sockets.adapter.rooms.get(battleId);
+          const clientsInRoom = room ? room.size : 0;
+          console.log(`👥 Clients in room ${battleId}: ${clientsInRoom}`);
+          
           // Update battle status to in-progress
           battle.status = 'in-progress';
           battle.startedAt = new Date();
@@ -222,16 +227,18 @@ export const initializeBattleSocket = (io) => {
           // Start 3-second countdown
           let countdown = 3;
           const countdownInterval = setInterval(() => {
+            console.log(`⏰ Countdown: ${countdown}`);
             io.to(battleId).emit('battle:countdown', { count: countdown });
             countdown--;
 
             if (countdown < 0) {
               clearInterval(countdownInterval);
+              console.log(`🚀 Emitting battle:start to room ${battleId}`);
               io.to(battleId).emit('battle:start', {
                 startTime: new Date(),
                 timeLimit: 900 // 15 minutes in seconds
               });
-              console.log(`🚀 Battle ${battleId} started!`);
+              console.log(`✅ Battle ${battleId} started! Event emitted.`);
             }
           }, 1000);
         }

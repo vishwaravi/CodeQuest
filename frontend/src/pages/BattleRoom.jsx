@@ -158,10 +158,13 @@ const BattleRoom = () => {
 
     socketService.onBattleStart((data) => {
       console.log('🚀 Battle started!', data);
+      console.log('📝 Setting battleStarted to TRUE');
       setCountdown(null);
       setBattleStarted(true);
       setTimeRemaining(data.timeLimit);
       toast.success('GO! Start coding!', { icon: '🚀', duration: 2000 });
+      
+      console.log('✅ Battle state updated - editor should be unlocked');
       
       // Start timer
       timerRef.current = setInterval(() => {
