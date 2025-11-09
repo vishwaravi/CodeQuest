@@ -99,7 +99,10 @@ export const submitSolution = async (req, res) => {
     console.log(`📤 User ${userId} submitting solution in battle ${battleId}`);
 
     // Validate battle - use findOne with battleId field (not _id)
-    const battle = await Battle.findOne({ battleId }).populate('question');
+    const battle = await Battle.findOne({ battleId })
+      .populate('question')
+      .populate('players.user', 'username rating avatar');
+    
     if (!battle) {
       return res.status(404).json({
         success: false,
@@ -157,11 +160,27 @@ export const submitSolution = async (req, res) => {
     // Check if both players have submitted
     const bothSubmitted = battle.players.every(p => p.submitted);
     let winner = null;
+    let winnerData = null;
 
     if (bothSubmitted) {
       console.log('🏁 Both players submitted - determining winner...');
       winner = await battle.determineWinner();
       await battle.save();
+      
+      // Get winner user data
+      if (winner) {
+        const winnerPlayer = battle.players.find(p => p.user._id.toString() === winner.toString());
+        if (winnerPlayer) {
+          winnerData = {
+            _id: winnerPlayer.user._id,
+            id: winnerPlayer.user._id,
+            username: winnerPlayer.user.username,
+            rating: winnerPlayer.user.rating
+          };
+        }
+      }
+      
+      console.log('🏆 Winner data:', winnerData);
     }
 
     res.status(200).json({
@@ -171,7 +190,7 @@ export const submitSolution = async (req, res) => {
         summary: executionResult.summary,
         results: executionResult.results,
         bothSubmitted,
-        winner: winner ? winner.toString() : null,
+        winner: winnerData,
         battleStatus: battle.status,
       },
     });
