@@ -160,20 +160,19 @@ export const submitSolution = async (req, res) => {
 
     console.log(`✅ Submission saved: ${executionResult.summary.passed}/${allTestCases.length} tests passed`);
 
-    // Reload battle data to get fresh submission status
-    await battle.populate('question');
-    await battle.populate('players.user', 'username rating avatar');
-
+    // Reload battle from database to get fresh data
+    const reloadedBattle = await Battle.findOne({ battleId });
+    
     // Check if both players have submitted
-    const bothSubmitted = battle.players.every(p => p.submittedAt != null);
+    const bothSubmitted = reloadedBattle.players.every(p => p.submittedAt != null);
     console.log('📊 Submission status:', {
       player1: {
-        userId: battle.players[0].user._id.toString(),
-        submittedAt: battle.players[0].submittedAt
+        userId: reloadedBattle.players[0].user.toString(),
+        submittedAt: reloadedBattle.players[0].submittedAt
       },
       player2: {
-        userId: battle.players[1].user._id.toString(),
-        submittedAt: battle.players[1].submittedAt
+        userId: reloadedBattle.players[1].user.toString(),
+        submittedAt: reloadedBattle.players[1].submittedAt
       },
       bothSubmitted
     });
@@ -183,17 +182,21 @@ export const submitSolution = async (req, res) => {
 
     if (bothSubmitted) {
       console.log('🏁 Both players submitted - determining winner...');
-      console.log('📊 Player 1 tests passed:', battle.players[0].testsPassed);
-      console.log('📊 Player 2 tests passed:', battle.players[1].testsPassed);
+      console.log('📊 Player 1 tests passed:', reloadedBattle.players[0].testsPassed);
+      console.log('📊 Player 2 tests passed:', reloadedBattle.players[1].testsPassed);
       
-      winner = await battle.determineWinner();
-      await battle.save();
+      // Use determineBattleWinner method (not determineWinner)
+      winner = reloadedBattle.determineBattleWinner();
+      await reloadedBattle.save();
       
       console.log('🏆 Winner determined:', winner);
       
+      // Populate to get winner user data
+      await reloadedBattle.populate('players.user', 'username rating avatar');
+      
       // Get winner user data
       if (winner) {
-        const winnerPlayer = battle.players.find(p => p.user._id.toString() === winner.toString());
+        const winnerPlayer = reloadedBattle.players.find(p => p.user._id.toString() === winner.toString());
         if (winnerPlayer) {
           winnerData = {
             _id: winnerPlayer.user._id,
