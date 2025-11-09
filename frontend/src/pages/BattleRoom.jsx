@@ -411,7 +411,16 @@ const BattleRoom = () => {
       if (response.data.bothSubmitted) {
         setBattleEnded(true);
         setWinner(response.data.winner);
-        toast.success('Battle completed!', { id: 'submission' });
+        
+        // Show winner announcement
+        const winnerUserId = response.data.winner?._id || response.data.winner?.id;
+        if (winnerUserId === userId) {
+          toast.success('🎉 Battle completed! You WON! 🏆', { id: 'submission', duration: 5000 });
+        } else if (response.data.winner) {
+          toast.error('💔 Battle completed! You lost!', { id: 'submission', duration: 5000 });
+        } else {
+          toast('🤝 Battle completed! It\'s a DRAW!', { id: 'submission', duration: 5000 });
+        }
       } else {
         toast.success('Solution submitted! Waiting for opponent...', { id: 'submission' });
       }
